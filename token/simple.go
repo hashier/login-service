@@ -18,6 +18,8 @@ package token
 import (
 	"encoding/json"
 	"errors"
+
+	"github.com/tink-ab/login-service/settings"
 )
 
 type SimpleProvider struct {
@@ -38,7 +40,7 @@ func (p *SimpleProvider) New(req Request) ([]byte, error) {
 	return v, err
 }
 
-func (p *SimpleProvider) Validate(token []byte, domain string, group string) (*Request, error) {
+func (p *SimpleProvider) Validate(token []byte, domain string, groups []string) (*Request, error) {
 	var t SimpleToken
 	err := json.Unmarshal(token, &t)
 	if err != nil {
@@ -54,7 +56,7 @@ func (p *SimpleProvider) Validate(token []byte, domain string, group string) (*R
 		return nil, errors.New("token domain mismatch")
 	}
 	for _, g := range t.Request.Groups {
-		if g == group {
+		if settings.StringIsInSlice(groups, g) {
 			return &t.Request, nil
 		}
 	}

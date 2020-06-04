@@ -31,7 +31,7 @@ type Validator struct {
 	verifier Verifier
 }
 
-func (v *Validator) Validate(d []byte, domain string, group string) (*Request, error) {
+func (v *Validator) Validate(d []byte, domain string, groups []string) (*Request, error) {
 	var p ProtectedCookie
 	err := json.Unmarshal(d, &p)
 	if err != nil {
@@ -54,7 +54,7 @@ func (v *Validator) Validate(d []byte, domain string, group string) (*Request, e
 	if pr == nil {
 		return nil, errors.New("provider not found")
 	}
-	return pr.Validate(c.Token, domain, group)
+	return pr.Validate(c.Token, domain, groups)
 }
 
 func NewValidator(c Crypto, ve Verifier, p map[string]Provider, t Time) *Validator {

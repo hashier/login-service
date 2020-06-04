@@ -19,15 +19,18 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	log "github.com/sirupsen/logrus"
 	"net/http"
+	"strings"
 
-	"github.com/tink-ab/login-service/context"
-	"github.com/tink-ab/login-service/session"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/jwt"
-	"google.golang.org/api/admin/directory/v1"
+	admin "google.golang.org/api/admin/directory/v1"
+
+	"github.com/tink-ab/login-service/context"
+	"github.com/tink-ab/login-service/session"
+	"github.com/tink-ab/login-service/settings"
 )
 
 // User is a retrieved and authentiacted user.
@@ -43,19 +46,9 @@ type User struct {
 	Gender        string `json:"gender"`
 }
 
-type OAuthSettings struct {
-	ClientID     string
-	ClientSecret string
-	CallbackURL  string
-}
-
-type ServiceAccount struct {
-	Email            string
-	PrivateKey       string
-	ImpersonateAdmin string
-}
-
 type OAuthProvider struct {
+	appSettings *settings.Settings
+
 	// Client-driven OAuth configuration (for login)
 	oauth *oauth2.Config
 
@@ -63,7 +56,7 @@ type OAuthProvider struct {
 	adminService *admin.Service
 
 	// Function to call when a session has been authenticated by this module
-	successCallback SuccesCallback
+	mfaDisabledCallback SuccesCallback
 
 	// Function to find out where to send the user when U2F is done
 	nextURLCallback NextURLCallback
@@ -126,6 +119,7 @@ func (p *OAuthProvider) CallbackHandler(c context.Context, s *session.LoginSessi
 	// We now known things about the user
 	s.Name = user.Name
 	s.Email = user.Email
+	s.Picture = user.Picture
 	groups, err := p.getGroups(s.Email)
 	if err != nil {
 		log.Errorf("Failed to get groups: %s", err)
@@ -137,36 +131,39 @@ func (p *OAuthProvider) CallbackHandler(c context.Context, s *session.LoginSessi
 	// Check if the user is a member of the required group
 	found := false
 	for _, group := range groups {
-		if group == s.RequiredGroup {
+		if settings.StringIsInSlice(s.DomainInfo.Groups, group) {
 			found = true
 			break
 		}
 	}
 	if !found {
-		log.Printf("user is not member of required group %s", s.RequiredGroup)
+		log.Printf("user is not member of required group %s", strings.Join(s.DomainInfo.Groups, ", "))
 		c.Error(http.StatusForbidden, errors.New("user not authorized"))
 		return
 	}
 
-	if p.successCallback != nil {
-		p.successCallback(c, s)
+	if s.DomainInfo.DisableMFA && p.mfaDisabledCallback != nil {
+		p.mfaDisabledCallback(p.appSettings, c, s)
+		return
 	}
 
 	c.Redirect(p.nextURLCallback(s))
 }
 
-func NewOAuth(sa ServiceAccount, oa OAuthSettings, successCallback SuccesCallback, nextURLCallback NextURLCallback) *OAuthProvider {
+func NewOAuth(appSettings *settings.Settings, mfaDisabledCallback SuccesCallback, nextURLCallback NextURLCallback) *OAuthProvider {
 	p := OAuthProvider{}
+
+	p.appSettings = appSettings
 
 	// Admin client used for server-to-server communication
 	scope := admin.AdminDirectoryGroupReadonlyScope
 	cfg := &jwt.Config{
-		Email:      sa.Email,
-		PrivateKey: []byte(sa.PrivateKey),
+		Email:      appSettings.ServiceAccount.Email,
+		PrivateKey: []byte(appSettings.ServiceAccount.PrivateKey),
 		Scopes:     []string{scope},
 		TokenURL:   google.JWTTokenURL,
 	}
-	cfg.Subject = sa.ImpersonateAdmin
+	cfg.Subject = appSettings.ServiceAccount.ImpersonateAdmin
 	client := cfg.Client(oauth2.NoContext)
 	service, err := admin.New(client)
 	if err != nil {
@@ -176,9 +173,9 @@ func NewOAuth(sa ServiceAccount, oa OAuthSettings, successCallback SuccesCallbac
 
 	// OAuth2 client used for client driven authentication (login)
 	p.oauth = &oauth2.Config{
-		ClientID:     oa.ClientID,
-		ClientSecret: oa.ClientSecret,
-		RedirectURL:  oa.CallbackURL,
+		ClientID:     appSettings.OAuth.ClientID,
+		ClientSecret: appSettings.OAuth.ClientSecret,
+		RedirectURL:  appSettings.OAuth.CallbackURL,
 		Scopes: []string{
 			"https://www.googleapis.com/auth/userinfo.email",
 			"https://www.googleapis.com/auth/userinfo.profile",
@@ -186,7 +183,7 @@ func NewOAuth(sa ServiceAccount, oa OAuthSettings, successCallback SuccesCallbac
 		Endpoint: google.Endpoint,
 	}
 
-	p.successCallback = successCallback
+	p.mfaDisabledCallback = mfaDisabledCallback
 	p.nextURLCallback = nextURLCallback
 
 	return &p

@@ -59,7 +59,7 @@ func (p *FakeTokenProvider) New(req Request) ([]byte, error) {
 	return []byte("test-token"), nil
 }
 
-func (p *FakeTokenProvider) Validate(b []byte, d string, g string) (*Request, error) {
+func (p *FakeTokenProvider) Validate(b []byte, d string, groups []string) (*Request, error) {
 	if string(b) != "test-token" {
 		return nil, errors.New("invalid token")
 	}
@@ -97,7 +97,7 @@ func NewTestRequest(p string, t string) []byte {
 	v, _ := json.Marshal(cs)
 	pc := ProtectedCookie{
 		Cookie: v,
-		Sig: []byte{byte(len(v))},
+		Sig:    []byte{byte(len(v))},
 	}
 	pv, _ := json.Marshal(pc)
 	return pv
@@ -113,10 +113,10 @@ func TestCreateValidate(t *testing.T) {
 
 	s := session.LoginSession{}
 	s.Domain = "test-domain"
-	c, err := m.Create(&s)
+	c, err := m.Create(&s, 0)
 	assert.NoError(t, err)
 
-	u, err := v.Validate(c, "test-domain", "test-group")
+	u, err := v.Validate(c, "test-domain", []string{"test-group"})
 	assert.NoError(t, err)
 	assert.Equal(t, "test-user", u.User)
 }
@@ -126,7 +126,7 @@ func TestValidateSuccess(t *testing.T) {
 
 	// Successful token
 	r := NewTestRequest("test-provider", "test-token")
-	u, err := v.Validate(r, "test-domain", "test-group")
+	u, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.NoError(t, err)
 	assert.Equal(t, "test-user", u.User)
 }
@@ -135,7 +135,7 @@ func TestValidateInvalidToken(t *testing.T) {
 	v := NewTestValidator()
 	// Invalid token
 	r := NewTestRequest("test-provider", "invalid-token")
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.Error(t, err)
 }
 
@@ -144,7 +144,7 @@ func TestValidateNoToken(t *testing.T) {
 
 	// No token
 	r := []byte{}
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.Error(t, err)
 }
 
@@ -153,7 +153,7 @@ func TestValidateCorruptToken(t *testing.T) {
 
 	// Corrupt token (base64)
 	r := []byte("****")
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.Error(t, err)
 }
 
@@ -162,7 +162,7 @@ func TestValidateCorruptTokenJSON(t *testing.T) {
 
 	// Corrupt token (json)
 	r := []byte(base64.URLEncoding.EncodeToString([]byte("{1:2}")))
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.Error(t, err)
 }
 
@@ -171,7 +171,7 @@ func TestValidateInvalidProvider(t *testing.T) {
 
 	// Invalid provider
 	r := NewTestRequest("invalid-provider", "")
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.EqualError(t, err, "provider not found")
 }
 
@@ -180,7 +180,7 @@ func TestValidateInvalidSignature(t *testing.T) {
 
 	// Invalid signature
 	r := []byte("{\"Sig\": \"Nw==\"}")
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.EqualError(t, err, "verification failed")
 }
 
@@ -189,6 +189,6 @@ func TestValidateFailedDecrypt(t *testing.T) {
 
 	// Fail decrypt
 	r := NewTestRequest("fail-decrypt", "")
-	_, err := v.Validate(r, "test-domain", "test-group")
+	_, err := v.Validate(r, "test-domain", []string{"test-group"})
 	assert.EqualError(t, err, "decrypt failed")
 }

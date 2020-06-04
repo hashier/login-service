@@ -39,28 +39,28 @@ func TestSimpleProvider(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test success
-	u, err := p.Validate(token, "test-domain", "test-group2")
+	u, err := p.Validate(token, "test-domain", []string{"test-group2"})
 	assert.Equal(t, "test-user", u.User)
 	assert.NoError(t, err)
 
 	// Test corrupt token
-	_, err = p.Validate([]byte("foobar"), "test-d0main", "test-group2")
+	_, err = p.Validate([]byte("foobar"), "test-d0main", []string{"test-group2"})
 	assert.Error(t, err)
 
 	// Test domain scope
-	_, err = p.Validate(token, "test-d0main", "test-group2")
+	_, err = p.Validate(token, "test-d0main", []string{"test-group2"})
 	assert.Error(t, err)
 
 	// Test group membership
-	_, err = p.Validate(token, "test-domain", "test-group3")
+	_, err = p.Validate(token, "test-domain", []string{"test-group3"})
 	assert.Error(t, err)
 
 	// Test generation revocation
-	_, err = pn.Validate(token, "test-domain", "test-group2")
+	_, err = pn.Validate(token, "test-domain", []string{"test-group2"})
 	assert.Error(t, err)
 
 	// Test expiry
 	ft.Add(time.Minute*15 + time.Second)
-	_, err = p.Validate(token, "test-domain", "test-group2")
+	_, err = p.Validate(token, "test-domain", []string{"test-group2"})
 	assert.Error(t, err)
 }

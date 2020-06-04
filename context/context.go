@@ -36,7 +36,9 @@ type Context interface {
 
 	Redirect(url string)
 
+	Request() *http.Request
 	Query(key string) string
+	Param(key string) string
 	Cookies() []*http.Cookie
 
 	BindJSON(obj interface{}) error
@@ -61,8 +63,16 @@ type GinContext struct {
 	g *gin.Context
 }
 
+func (c *GinContext) Request() *http.Request {
+	return c.g.Request
+}
+
 func (c *GinContext) Query(key string) string {
 	return c.g.Query(key)
+}
+
+func (c *GinContext) Param(name string) string {
+	return c.g.Param(name)
 }
 
 func (c *GinContext) UserIP() string {

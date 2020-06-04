@@ -1,5 +1,5 @@
 //
-// Copyright 2017 Tink AB
+// Copyright 2019 Tink AB
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,4 +13,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-package provider
+package store
+
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"path"
+
+	"github.com/tink-ab/login-service/provider/webauthn/user"
+)
+
+type WebAuthnStore interface {
+	GetUser(email string) (*user.WebAuthnUser, error)
+	PutUser(user *user.WebAuthnUser) error
+	DeleteUser(email string) error
+	ListUsers() ([]user.WebAuthnUser, error)
+}
+
+func filename(dir string, email string, suffix string) string {
+	hash := sha256.Sum256([]byte(email))
+	return path.Join(dir, hex.EncodeToString(hash[:])+suffix)
+}

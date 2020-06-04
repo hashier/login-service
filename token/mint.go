@@ -18,15 +18,16 @@ package token
 import (
 	"encoding/json"
 	"errors"
-	log "github.com/sirupsen/logrus"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"github.com/tink-ab/login-service/session"
 )
 
 type Minter struct {
 	// Max TTL
-	ttl time.Duration
+	maxTTL time.Duration
 	// Default token provider
 	defaultProvider string
 	// Supported token providers
@@ -39,12 +40,15 @@ type Minter struct {
 	signer Signer
 }
 
-func (m *Minter) Create(s *session.LoginSession) ([]byte, error) {
+func (m *Minter) Create(s *session.LoginSession, ttl time.Duration) ([]byte, error) {
 	if s.Used {
 		return nil, errors.New("token used twice")
 	}
 
-	expiry := m.time.Now().Add(m.ttl)
+	if ttl > m.maxTTL {
+		ttl = m.maxTTL
+	}
+	expiry := m.time.Now().Add(ttl)
 
 	req := Request{}
 	req.Domain = s.Domain
@@ -80,9 +84,9 @@ func (m *Minter) Create(s *session.LoginSession) ([]byte, error) {
 	return v, nil
 }
 
-func NewMinter(ttl time.Duration, c Crypto, s Signer, p map[string]Provider, dp string, t Time) *Minter {
+func NewMinter(maxTTL time.Duration, c Crypto, s Signer, p map[string]Provider, dp string, t Time) *Minter {
 	m := Minter{}
-	m.ttl = ttl
+	m.maxTTL = maxTTL
 	m.signer = s
 	m.providers = p
 	m.defaultProvider = dp

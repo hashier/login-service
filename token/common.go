@@ -22,7 +22,7 @@ import (
 type Provider interface {
 	New(req Request) ([]byte, error)
 
-	Validate(token []byte, domain string, group string) (*Request, error)
+	Validate(token []byte, domain string, groups []string) (*Request, error)
 }
 
 type Time interface {

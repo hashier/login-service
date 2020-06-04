@@ -20,31 +20,34 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/url"
 	"strings"
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/tink-ab/login-service/context"
+	"github.com/tink-ab/login-service/settings"
 )
 
 type LoginSession struct {
-	Expiry        time.Time
-	SessionID     string
-	ClientMark    string
-	Domain        string
-	RequiredGroup string
+	Expiry     time.Time
+	SessionID  string
+	ClientMark string
+	Domain     string
+	DomainInfo settings.DomainInfo
 
-	Email  string
-	Name   string
-	Groups []string
+	Email   string
+	Name    string
+	Picture string
+	Groups  []string
 
 	PresenceValidated bool
 
 	RedirectURL string
-	U2FURL      string
+	MFAURL      string
 
 	Used bool
 }
@@ -59,24 +62,24 @@ func newNonce() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-func New(c context.Context, ttl time.Duration, fallback string, u2furl string, allowedDomain string, group string) *LoginSession {
+func New(c context.Context, appSettings *settings.Settings, domainInfo settings.DomainInfo) *LoginSession {
 	s := LoginSession{}
 	s.SessionID = newNonce()
 	s.ClientMark = c.ClientMark()
 	s.Domain = c.Query("d")
-	s.RequiredGroup = group
-	s.Expiry = time.Now().Add(ttl)
+	s.DomainInfo = domainInfo
+	s.Expiry = time.Now().Add(appSettings.LoginSessionTTL)
 
 	r := c.Query("r")
 	if r == "" {
-		s.RedirectURL = fallback
+		s.RedirectURL = appSettings.FallbackURL
 	} else {
 		ru, err := url.Parse(r)
 		if err != nil {
 			c.Error(http.StatusBadRequest, errors.New("invalid redirect url"))
 			return nil
 		}
-		if !strings.HasSuffix(ru.Host, allowedDomain) {
+		if !strings.HasSuffix(ru.Hostname(), appSettings.AllowedRedirectDomain) {
 			c.Error(http.StatusBadRequest, errors.New("invalid redirect url"))
 			return nil
 		}
@@ -87,9 +90,9 @@ func New(c context.Context, ttl time.Duration, fallback string, u2furl string, a
 		s.RedirectURL = r
 	}
 
-	s.U2FURL = fmt.Sprintf(u2furl, s.SessionID)
+	s.MFAURL = fmt.Sprintf(appSettings.MFAURL, s.SessionID)
 
-	if s.Domain == "" || s.RequiredGroup == "" {
+	if s.Domain == "" || s.DomainInfo.Groups == nil || len(s.DomainInfo.Groups) == 0 {
 		c.Error(http.StatusBadRequest, errors.New("invalid domain"))
 		return nil
 	}
