@@ -22,7 +22,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-
 const PrivateKey = "MHcCAQEEIGhv4rm9D7Itorz/YsGZlLUlx9XwkbcNVAd1oQs4U+vuoAoGCCqGSM49AwEHoUQDQgAEkk5UQvVDdHaftMbCkxi+dc+UpstInXiyIBZflDpbGPVfkEx2zaP4bkYIyvGnKY/kjpa53Cc/YCL5NUax1BH2uw=="
 const PublicKey = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEkk5UQvVDdHaftMbCkxi+dc+UpstInXiyIBZflDpbGPVfkEx2zaP4bkYIyvGnKY/kjpa53Cc/YCL5NUax1BH2uw=="
 

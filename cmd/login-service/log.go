@@ -19,8 +19,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 func GinLogger(logger *logrus.Logger, withFields bool) gin.HandlerFunc {
@@ -33,7 +33,7 @@ func GinLogger(logger *logrus.Logger, withFields bool) gin.HandlerFunc {
 		latency := end.Sub(start)
 
 		entry := logrus.NewEntry(logger)
-		if (withFields) {
+		if withFields {
 			entry = entry.WithFields(logrus.Fields{
 				"status":     c.Writer.Status(),
 				"method":     c.Request.Method,

@@ -29,7 +29,7 @@ type Crypto interface {
 }
 
 type StdCrypto struct {
-	aesKey  []byte
+	aesKey []byte
 }
 
 func (c *StdCrypto) Encrypt(b []byte) []byte {
